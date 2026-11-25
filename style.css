@@ -626,6 +626,25 @@ select:hover, input[type="number"]:hover { border-color: var(--line-strong); }
 .switch-row input { width: 18px; height: 18px; accent-color: var(--danger); }
 .dialog-actions { display: flex; justify-content: flex-end; gap: 8px; margin-top: 8px; }
 
+/* ---------- Llamado a la acción: «Ejecutar instantáneo» antes de la primera simulación ---------- */
+#btnRun { position: relative; overflow: hidden; isolation: isolate; }
+#btnRun.needs-run {
+  border-color: #E2C877;
+  box-shadow: 0 0 0 2px rgba(200, 169, 81, .55);
+  animation: runHalo 1.8s ease-out infinite;
+}
+#btnRun.needs-run::after {
+  content: ""; position: absolute; top: -2px; bottom: -2px; left: -60%; width: 40%; z-index: -1;
+  background: linear-gradient(100deg, transparent, rgba(255, 249, 225, .9), transparent);
+  transform: skewX(-20deg);
+  animation: replayShimmer 2.4s ease-in-out infinite;
+}
+@keyframes runHalo {
+  0% { box-shadow: 0 0 0 2px rgba(200, 169, 81, .55), 0 0 0 0 rgba(200, 169, 81, .6), 0 8px 26px -8px rgba(200, 169, 81, .8); }
+  70% { box-shadow: 0 0 0 2px rgba(200, 169, 81, .55), 0 0 0 14px rgba(200, 169, 81, 0), 0 8px 26px -8px rgba(200, 169, 81, .8); }
+  100% { box-shadow: 0 0 0 2px rgba(200, 169, 81, .55), 0 0 0 0 rgba(200, 169, 81, 0), 0 8px 26px -8px rgba(200, 169, 81, .8); }
+}
+
 /* ---------- Botón de ayuda (?) ---------- */
 .title-row { display: flex; align-items: center; gap: 16px; flex-wrap: wrap; margin-bottom: .55em; }
 .title-row h2 { margin: 0; }

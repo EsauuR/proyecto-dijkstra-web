@@ -411,6 +411,7 @@ function onFinished() {
 function runInstant(silent) {
   cancelStepper();
   if (!validSelection()) return;
+  setPending(false);        // la primera ejecución retira el llamado a la acción
   logLines = [];
   const t0 = performance.now();
   const events = [];
@@ -430,6 +431,7 @@ function startStepper() {
   if (!validSelection()) return;
   stopAnim();
   state.bfs = null;
+  setPending(false);
   logLines = [];
   state.stepper = dijkstra(buildAdjacency(), state.origin, state.dest);
   state.stepCount = 0;
@@ -516,23 +518,36 @@ function simulateAccident() {
   e.blocked = true;
   toast(`💥 Accidente en ${e.name} (${state.nodes[e.u].code}–${state.nodes[e.v].code}): vía cerrada`);
   updateChips();
-  runInstant(true);
+  recalcIfShown();          // solo recalcula si el usuario ya ejecutó una simulación
+}
+
+/* Estado inicial "pendiente": mapa limpio, sin ruta ni unidad, esperando a Ejecutar */
+function setPending(on) {
+  btnRun.classList.toggle('needs-run', on);
+}
+function clearSimulation() {
+  cancelStepper();
+  stopAnim();
+  state.vis = null;
+  state.bfs = null;
+  logLines = [];
+  setPending(true);
 }
 function resetTraffic() {
-  cancelStepper();
   state.edges = freshEdges();
   state.peak = false;
   syncPeakButton();
   updateChips();
-  toast('Tráfico y calles restablecidos');
-  recalcIfShown();
+  clearSimulation();
   renderAll();
+  toast('Ciudad restablecida · pulsa ⚡ Ejecutar instantáneo');
 }
 function newCity() {
   const city = generateCity();
   loadCity(city);
-  toast(`🎲 Nueva ciudad: ${city.nodes.length} zonas y ${city.edges.length} calles`);
-  runInstant(true);
+  clearSimulation();
+  renderAll();
+  toast(`🎲 Nueva ciudad: ${city.nodes.length} zonas y ${city.edges.length} calles · pulsa ⚡ Ejecutar`);
 }
 function updateChips() {
   $('chipPeak').hidden = !state.peak;
@@ -1558,6 +1573,7 @@ function runVerification() {
    ========================================================= */
 readColors();
 loadCity(DEFAULT_CITY);
+setPending(true);           // estado inicial: sin ruta, esperando a «Ejecutar instantáneo»
 window.addEventListener('resize', resizeCanvas);
 if (document.fonts && document.fonts.ready) document.fonts.ready.then(() => draw());
 resizeCanvas();
