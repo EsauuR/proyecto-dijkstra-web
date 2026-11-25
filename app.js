@@ -550,11 +550,12 @@ const easeInOut = (t) => t < 0.5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) /
 const LOOP_PAUSE = 1100;   // ms de pausa en el destino antes de volver a salir
 
 /**
- * Lanza la unidad sobre la ruta óptima. Recorre la ruta en bucle continuo
- * mientras exista la ruta; cualquier recálculo la reinicia desde el origen.
- * `force` (botón «Repetir envío») la anima aunque el sistema pida reducir animaciones.
+ * Lanza la unidad desde el origen sobre la ruta óptima.
+ * - loop = false (Ejecutar / recálculos): un recorrido completo y se detiene en el destino.
+ * - loop = true («Repetir envío»): recorre la ruta en bucle continuo.
+ * Siempre se anima, aunque el sistema pida reducir animaciones.
  */
-function startVehicle(path, force = false) {
+function startVehicle(path, loop = false) {
   if (path.length < 2) { stopAnim(); return; }
   const pts = path.map(i => ({ x: state.nodes[i].x, y: state.nodes[i].y }));
   const lens = [];
@@ -564,18 +565,17 @@ function startVehicle(path, force = false) {
     lens.push(l); total += l;
   }
   const now = performance.now();
-  const animate = force || !reduceMotion.matches;
   state.anim = {
     pts, lens, total, t0: now, last: now,
     dur: Math.max(2600, Math.min(6500, total / 200 * 1000)),
     minutes: state.vis && state.vis.dist ? state.vis.dist[state.dest] : 0,
     trail: [], particles: [],
-    moving: animate,
-    loop: animate,
+    moving: true,
+    loop: !!loop,
     lap: 1,
-    progress: animate ? 0 : 1,
-    arrivedAt: animate ? 0 : now - 5000,
-    pos: animate ? { ...pts[0], ang: 0 } : { ...pts[pts.length - 1], ang: 0 }
+    progress: 0,
+    arrivedAt: 0,
+    pos: { ...pts[0], ang: 0 }
   };
   updateComputing();
   kick();
@@ -631,6 +631,7 @@ function stepAnim(now) {
         const ang = rand(0, Math.PI * 2), sp = rand(50, 190);
         a.particles.push({ x: a.pos.x, y: a.pos.y, vx: Math.cos(ang) * sp, vy: Math.sin(ang) * sp, life: 1, size: rand(1.6, 3.6) });
       }
+      if (!a.loop) updateComputing();   // recorrido único terminado: la unidad queda en el destino
     }
     active = true;
   } else if (a.trail.length) {
@@ -676,8 +677,8 @@ function replayDispatch() {
     runInstant(true);
   }
   if (state.vis && state.vis.type === 'found') {
-    startVehicle(state.vis.path, true);
-    toast(`🚑 Unidad despachada: ${state.nodes[state.origin].name} → ${state.nodes[state.dest].name}`);
+    startVehicle(state.vis.path, true);   // bucle continuo
+    toast(`🚑 Unidad en servicio continuo: ${state.nodes[state.origin].name} → ${state.nodes[state.dest].name}`);
   } else {
     toast('No hay ruta disponible para enviar la unidad');
   }
@@ -929,13 +930,14 @@ function draw(now = performance.now()) {
   }
 
   // ---- Marcador de la unidad ----
-  if (anim && (anim.moving || anim.loop)) {
+  if (anim) {
     const p = anim.pos;
     const ph = now / 1000;
-    const pulse = 0.5 + 0.5 * Math.sin(ph * 6);
+    const parked = !anim.moving && !anim.loop;          // recorrido único ya terminado
+    const pulse = parked ? 0.5 : 0.5 + 0.5 * Math.sin(ph * 6);
     ctx.save();
-    // Ondas expansivas del halo (dos anillos desfasados)
-    for (let k = 0; k < 2; k++) {
+    // Ondas expansivas del halo (dos anillos desfasados); en reposo no se dibujan
+    for (let k = 0; k < (parked ? 0 : 2); k++) {
       const t = ((ph * 1.2) + k * 0.5) % 1;
       ctx.beginPath(); ctx.arc(p.x, p.y, 16 + 34 * t, 0, Math.PI * 2);
       ctx.strokeStyle = C.gold; ctx.globalAlpha = 0.6 * (1 - t); ctx.lineWidth = 2.5;
