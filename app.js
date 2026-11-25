@@ -614,7 +614,8 @@ function pointAt(a, d) {
 function stepAnim(now) {
   const a = state.anim;
   if (!a) return false;
-  const dt = Math.min(0.05, (now - a.last) / 1000);
+  // El primer fotograma puede traer una marca de tiempo anterior a t0: nunca valores negativos
+  const dt = Math.max(0, Math.min(0.05, (now - a.last) / 1000));
   a.last = now;
   let active = false;
 
@@ -629,7 +630,7 @@ function stepAnim(now) {
   }
 
   if (a.moving) {
-    const p = Math.min(1, (now - a.t0) / a.dur);
+    const p = Math.max(0, Math.min(1, (now - a.t0) / a.dur));
     a.progress = easeInOut(p);
     a.pos = pointAt(a, a.progress * a.total);
     a.trail.push({ x: a.pos.x, y: a.pos.y });
@@ -1315,9 +1316,11 @@ $('quickbar').addEventListener('submit', (evt) => {
   if (o === d) { toast('Elige un origen y un destino distintos'); return; }
   state.origin = o; state.dest = d;
   syncSelects();
-  cancelStepper();
+  // Mapa limpio y pulso en «Ejecutar instantáneo»: el usuario inicia la simulación a mano
+  clearSimulation();
+  renderAll();
   $('simulador').scrollIntoView({ behavior: reduceMotion.matches ? 'auto' : 'smooth', block: 'start' });
-  setTimeout(() => runInstant(false), reduceMotion.matches ? 0 : 700);
+  toast(`${state.nodes[o].name} → ${state.nodes[d].name} listos · pulsa ⚡ Ejecutar instantáneo`);
 });
 
 btnPeak.addEventListener('click', togglePeak);
