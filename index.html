@@ -1,0 +1,483 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Dijkstra en la Ciudad</title>
+  <meta name="description" content="Proyecto universitario: el algoritmo de Dijkstra aplicado a la optimización de rutas urbanas y el despacho de emergencias, con simulador interactivo.">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="style.css">
+  <script>
+    // Aplica el tema guardado antes de pintar para evitar parpadeo
+    (function () {
+      try {
+        var t = localStorage.getItem('tema');
+        if (t === 'light' || t === 'dark') document.documentElement.setAttribute('data-theme', t);
+      } catch (e) {}
+    })();
+  </script>
+</head>
+<body>
+
+  <!-- ============ NAVEGACIÓN ============ -->
+  <header class="navbar" id="navbar">
+    <div class="nav-inner">
+      <a href="#introduccion" class="brand" aria-label="Inicio">
+        <span class="brand-mark" aria-hidden="true">
+          <svg viewBox="0 0 24 24" width="22" height="22"><circle cx="5" cy="6" r="2.5"/><circle cx="19" cy="6" r="2.5"/><circle cx="12" cy="18" r="2.5"/><path d="M7 7l3.5 9M17 7l-3.5 9M7.5 6h9" fill="none" stroke-width="1.8"/></svg>
+        </span>
+        <span>Dijkstra<span class="brand-accent">Urbano</span></span>
+      </a>
+
+      <nav class="nav-links" id="navLinks" aria-label="Secciones">
+        <a href="#introduccion">Introducción</a>
+        <a href="#problema">Problema</a>
+        <a href="#objetivo">Objetivo</a>
+        <a href="#teoria">Marco Teórico</a>
+        <a href="#simulador">Simulador</a>
+        <a href="#conclusiones">Conclusiones</a>
+      </nav>
+
+      <div class="nav-actions">
+        <button class="icon-btn" id="themeToggle" aria-label="Cambiar tema claro/oscuro" title="Cambiar tema">
+          <svg class="icon-sun" viewBox="0 0 24 24" width="20" height="20"><circle cx="12" cy="12" r="4.5"/><path d="M12 1.5v3M12 19.5v3M1.5 12h3M19.5 12h3M4.6 4.6l2.1 2.1M17.3 17.3l2.1 2.1M4.6 19.4l2.1-2.1M17.3 6.7l2.1-2.1" fill="none" stroke-width="1.8" stroke-linecap="round"/></svg>
+          <svg class="icon-moon" viewBox="0 0 24 24" width="20" height="20"><path d="M20 14.5A8.5 8.5 0 0 1 9.5 4a8.5 8.5 0 1 0 10.5 10.5z"/></svg>
+        </button>
+        <button class="icon-btn menu-btn" id="menuToggle" aria-label="Abrir menú" aria-expanded="false" aria-controls="navLinks">
+          <svg viewBox="0 0 24 24" width="22" height="22"><path d="M3 6h18M3 12h18M3 18h18" fill="none" stroke-width="2" stroke-linecap="round"/></svg>
+        </button>
+      </div>
+    </div>
+  </header>
+
+  <main>
+
+    <!-- ============ 1. INTRODUCCIÓN ============ -->
+    <section id="introduccion" class="section hero">
+      <div class="container hero-grid">
+        <div class="hero-text">
+          <span class="eyebrow">Proyecto universitario · Algoritmos y Estructuras de Datos</span>
+          <h1>El algoritmo de Dijkstra <span class="grad">al servicio de la ciudad</span></h1>
+          <p class="lead">
+            Cada día millones de personas, ambulancias y camiones de bomberos atraviesan calles saturadas.
+            Elegir bien la ruta puede ahorrar minutos al ir al trabajo y, en una emergencia, salvar vidas.
+            Este proyecto muestra cómo un algoritmo clásico de 1956 sigue resolviendo hoy ese problema.
+          </p>
+          <div class="hero-cta">
+            <a href="#simulador" class="btn btn-primary">Probar el simulador</a>
+            <a href="#teoria" class="btn btn-ghost">Ver la teoría</a>
+          </div>
+        </div>
+
+        <div class="hero-stats">
+          <div class="stat-card">
+            <span class="stat-num">~100 h/año</span>
+            <span class="stat-label">Horas que puede perder en atascos un conductor en las ciudades más congestionadas del mundo (estimaciones tipo INRIX Global Traffic Scorecard)</span>
+          </div>
+          <div class="stat-card">
+            <span class="stat-num">8 min</span>
+            <span class="stat-label">Tiempo de respuesta que se suele tomar como referencia para emergencias médicas urbanas</span>
+          </div>
+          <div class="stat-card">
+            <span class="stat-num">O((V+E) log V)</span>
+            <span class="stat-label">Lo que tarda Dijkstra con montículo binario: le basta para miles de intersecciones en milisegundos</span>
+          </div>
+        </div>
+      </div>
+
+      <div class="container">
+        <div class="card intro-card">
+          <h2 class="section-title"><span class="num">01</span> Introducción</h2>
+          <p>
+            Las ciudades crecen más rápido que sus vías. El aumento del parque vehicular, las obras públicas,
+            los accidentes y los horarios de máxima demanda hacen que <strong>la ruta más corta en distancia
+            casi nunca sea la más rápida en tiempo</strong>. Las aplicaciones de navegación, las centrales de
+            despacho de emergencias (911), las empresas de reparto y el transporte público necesitan saber,
+            en segundos, qué camino minimiza el tiempo de traslado <em>en las condiciones actuales</em>.
+          </p>
+          <p>
+            Una red urbana se puede modelar como un <strong>grafo</strong>: las intersecciones o zonas son
+            <em>nodos</em> y las calles son <em>aristas</em> con un peso que representa los minutos necesarios
+            para recorrerlas. Sobre ese modelo, el <strong>algoritmo de Dijkstra</strong> encuentra el camino
+            de menor costo desde un origen hacia todos los demás puntos, siempre que los pesos no sean negativos,
+            condición que el tiempo cumple de forma natural.
+          </p>
+          <div class="pill-row">
+            <span class="pill">🚑 Ambulancias</span>
+            <span class="pill">🚒 Bomberos</span>
+            <span class="pill">🚓 Patrullas</span>
+            <span class="pill">📦 Logística</span>
+            <span class="pill">🚌 Transporte público</span>
+            <span class="pill">🗺️ Navegación GPS</span>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ============ 2. DEFINICIÓN DEL PROBLEMA ============ -->
+    <section id="problema" class="section">
+      <div class="container">
+        <h2 class="section-title"><span class="num">02</span> Definición del Problema</h2>
+        <p class="section-lead">
+          Una ciudad no es un mapa estático. El tiempo para recorrer una calle cambia durante el día
+          y una sola vía bloqueada puede obligar a recalcular toda la ruta.
+        </p>
+
+        <div class="grid-3">
+          <article class="card feature">
+            <div class="feature-icon warn">⏱️</div>
+            <h3>Congestión variable</h3>
+            <p>En hora pico, el tiempo para cruzar las avenidas centrales puede duplicarse. Una ruta que a las
+              11:00 tarda 15 minutos puede tardar 30 a las 18:00. Los pesos del grafo <strong>no son fijos</strong>.</p>
+          </article>
+          <article class="card feature">
+            <div class="feature-icon danger">⛔</div>
+            <h3>Bloqueos imprevistos</h3>
+            <p>Accidentes, manifestaciones, inundaciones u obras cierran calles sin previo aviso. En el modelo,
+              eso equivale a <strong>eliminar una arista</strong> y la solución anterior puede dejar de ser válida.</p>
+          </article>
+          <article class="card feature">
+            <div class="feature-icon accent">🚨</div>
+            <h3>Decisiones críticas</h3>
+            <p>Un despachador de emergencias debe elegir qué unidad enviar y por dónde. Cada minuto de retraso
+              en un paro cardíaco reduce las probabilidades de supervivencia, así que la decisión debe ser <strong>óptima e inmediata</strong>.</p>
+          </article>
+        </div>
+
+        <div class="card problem-statement">
+          <h3>Planteamiento formal</h3>
+          <p>
+            Dado un grafo ponderado <code>G = (V, E, w)</code> que representa la red vial, donde
+            <code>w(u,v) ≥ 0</code> son los minutos estimados para ir de la zona <code>u</code> a la zona
+            <code>v</code> en las condiciones actuales de tráfico, y dados un nodo de <strong>origen</strong>
+            <code>s</code> (p. ej. la estación de bomberos) y un nodo de <strong>destino</strong> <code>t</code>
+            (el lugar de la emergencia), se busca el camino <code>P = (s, …, t)</code> que minimice
+          </p>
+          <div class="formula">T(P) = Σ<sub>(u,v) ∈ P</sub> w(u, v)</div>
+          <p>
+            y que pueda <strong>recalcularse al instante</strong> cuando los pesos cambian (hora pico) o una
+            arista desaparece (accidente).
+          </p>
+        </div>
+      </div>
+    </section>
+
+    <!-- ============ 3. OBJETIVO GENERAL ============ -->
+    <section id="objetivo" class="section alt">
+      <div class="container">
+        <h2 class="section-title"><span class="num">03</span> Objetivo General</h2>
+        <div class="card objective">
+          <div class="objective-icon" aria-hidden="true">🎯</div>
+          <p class="objective-text">
+            Desarrollar una <strong>herramienta web visual e interactiva</strong> que modele una red urbana
+            como un grafo ponderado y aplique el <strong>algoritmo de Dijkstra</strong> para calcular en tiempo real
+            el camino de menor tiempo entre dos zonas. La herramienta debe permitir simular congestión
+            (hora pico) y bloqueos (accidentes) y mostrar paso a paso cómo el algoritmo llega a la solución óptima.
+          </p>
+        </div>
+
+        <h3 class="subhead">Objetivos específicos</h3>
+        <ol class="objectives-list">
+          <li><span>1</span><div><strong>Modelar</strong> una ciudad de 10 zonas y sus calles como un grafo no dirigido con pesos en minutos.</div></li>
+          <li><span>2</span><div><strong>Implementar</strong> Dijkstra con una cola de prioridad (montículo binario) en JavaScript.</div></li>
+          <li><span>3</span><div><strong>Visualizar</strong> en Canvas los nodos visitados, las relajaciones y la ruta óptima.</div></li>
+          <li><span>4</span><div><strong>Simular</strong> escenarios reales: hora pico, accidentes y edición manual de calles.</div></li>
+          <li><span>5</span><div><strong>Analizar</strong> cómo cambian la ruta y el tiempo total ante cada perturbación.</div></li>
+        </ol>
+      </div>
+    </section>
+
+    <!-- ============ 4. MARCO TEÓRICO ============ -->
+    <section id="teoria" class="section">
+      <div class="container">
+        <h2 class="section-title"><span class="num">04</span> Marco Teórico</h2>
+        <p class="section-lead">
+          Edsger W. Dijkstra concibió el algoritmo en 1956 y lo publicó en 1959. Es un algoritmo
+          <em>voraz</em>: en cada paso fija definitivamente la distancia del nodo más cercano todavía no procesado.
+        </p>
+
+        <div class="grid-2">
+          <article class="card">
+            <h3>Grafos ponderados</h3>
+            <p>Un grafo <code>G = (V, E)</code> está formado por un conjunto de <strong>nodos</strong> (vértices)
+              <code>V</code> y un conjunto de <strong>aristas</strong> <code>E</code> que los conectan. Es
+              <em>ponderado</em> cuando cada arista tiene un número asociado, su <strong>peso</strong> o costo.</p>
+            <ul class="def-list">
+              <li><b>Nodo:</b> una zona urbana o intersección (Hospital, Centro, Aeropuerto…).</li>
+              <li><b>Arista:</b> una calle que une dos zonas. Si es doble sentido, el grafo es <em>no dirigido</em>.</li>
+              <li><b>Peso:</b> minutos de recorrido. Siempre ≥ 0, que es lo que Dijkstra necesita.</li>
+              <li><b>Camino:</b> secuencia de nodos conectados; su costo es la suma de sus pesos.</li>
+            </ul>
+          </article>
+
+          <article class="card">
+            <h3>Ejemplo mínimo</h3>
+            <svg class="mini-graph" viewBox="0 0 320 190" role="img" aria-label="Grafo de ejemplo con nodos A, B, C y D">
+              <g class="mg-edges">
+                <line x1="50" y1="95" x2="160" y2="35"/>
+                <line x1="50" y1="95" x2="160" y2="155"/>
+                <line x1="160" y1="35" x2="160" y2="155"/>
+                <line x1="160" y1="35" x2="270" y2="95" class="mg-path"/>
+                <line x1="160" y1="155" x2="270" y2="95"/>
+                <line x1="50" y1="95" x2="160" y2="35" class="mg-path"/>
+              </g>
+              <g class="mg-w">
+                <text x="92" y="55">4</text>
+                <text x="92" y="145">2</text>
+                <text x="168" y="100">5</text>
+                <text x="222" y="55">3</text>
+                <text x="222" y="145">8</text>
+              </g>
+              <g class="mg-nodes">
+                <circle cx="50" cy="95" r="18"/><text x="50" y="100">A</text>
+                <circle cx="160" cy="35" r="18"/><text x="160" y="40">B</text>
+                <circle cx="160" cy="155" r="18"/><text x="160" y="160">C</text>
+                <circle cx="270" cy="95" r="18"/><text x="270" y="100">D</text>
+              </g>
+            </svg>
+            <p class="caption">De A a D: <code>A→B→D = 7</code> es mejor que <code>A→C→D = 10</code>.
+              Dijkstra lo descubre sin probar todos los caminos posibles.</p>
+          </article>
+        </div>
+
+        <div class="grid-2">
+          <article class="card">
+            <h3>Lógica de relajación</h3>
+            <p>El corazón del algoritmo es la <strong>relajación</strong> de una arista. Si conocemos la mejor
+              distancia provisional a <code>u</code> y existe la calle <code>(u, v)</code>, comprobamos si pasar
+              por <code>u</code> mejora la distancia a <code>v</code>:</p>
+            <div class="formula">si d[u] + w(u,v) &lt; d[v] &nbsp;⟹&nbsp; d[v] ← d[u] + w(u,v), &nbsp;prev[v] ← u</div>
+            <p>Al principio <code>d[s] = 0</code> y <code>d[v] = ∞</code> para todo lo demás. En cada iteración se
+              extrae el nodo con menor <code>d</code> de la cola de prioridad, su distancia queda <strong>definitiva</strong>
+              y se relajan todas sus aristas. Como los pesos no son negativos, ningún camino posterior puede mejorar
+              un nodo ya fijado: esa es la clave de su corrección.</p>
+          </article>
+
+          <article class="card">
+            <h3>Complejidad computacional</h3>
+            <table class="complexity">
+              <thead><tr><th>Estructura de la cola</th><th>Tiempo</th></tr></thead>
+              <tbody>
+                <tr><td>Arreglo simple (búsqueda lineal)</td><td><code>O(V²)</code></td></tr>
+                <tr class="hl"><td>Montículo binario <em>(usado aquí)</em></td><td><code>O((V+E) log V)</code></td></tr>
+                <tr><td>Montículo de Fibonacci</td><td><code>O(E + V log V)</code></td></tr>
+              </tbody>
+            </table>
+            <p>Con montículo binario cada nodo se extrae una vez (<code>V · log V</code>) y cada arista puede provocar
+              una inserción (<code>E · log V</code>). Las redes viales son <strong>grafos dispersos</strong>
+              (<code>E ≈ 2–4·V</code>), así que esta versión es la más práctica. Espacio: <code>O(V + E)</code>.</p>
+          </article>
+        </div>
+
+        <article class="card">
+          <h3>Pseudocódigo</h3>
+          <pre class="code"><code><span class="kw">función</span> <span class="fn">Dijkstra</span>(G, s, t):
+    <span class="kw">para cada</span> v <span class="kw">en</span> G.V:
+        d[v]    ← ∞
+        prev[v] ← NULO
+    d[s] ← 0
+    Q ← ColaDePrioridadMin()          <span class="cm">// montículo binario</span>
+    Q.insertar(s, 0)
+
+    <span class="kw">mientras</span> Q no esté vacía:
+        (u, du) ← Q.extraerMin()
+        <span class="kw">si</span> u ya fue visitado: <span class="kw">continuar</span>   <span class="cm">// entrada obsoleta</span>
+        marcar u como visitado         <span class="cm">// d[u] es definitiva</span>
+        <span class="kw">si</span> u = t: <span class="kw">romper</span>                 <span class="cm">// destino alcanzado</span>
+
+        <span class="kw">para cada</span> (v, w) <span class="kw">en</span> G.adyacentes(u):
+            <span class="kw">si</span> du + w &lt; d[v]:           <span class="cm">// relajación</span>
+                d[v]    ← du + w
+                prev[v] ← u
+                Q.insertar(v, d[v])
+
+    <span class="kw">retornar</span> d, prev
+
+<span class="kw">función</span> <span class="fn">ReconstruirRuta</span>(prev, t):
+    ruta ← []
+    <span class="kw">mientras</span> t ≠ NULO:
+        ruta.agregarAlInicio(t)
+        t ← prev[t]
+    <span class="kw">retornar</span> ruta</code></pre>
+        </article>
+      </div>
+    </section>
+
+    <!-- ============ 5. SIMULADOR ============ -->
+    <section id="simulador" class="section alt">
+      <div class="container">
+        <h2 class="section-title"><span class="num">05</span> Aplicación en Vivo: Simulador</h2>
+        <p class="section-lead">
+          Elige un origen y un destino, altera el tráfico y observa cómo Dijkstra recalcula la mejor ruta.
+          <strong>Haz clic sobre cualquier calle</strong> para cambiar sus minutos o cerrarla.
+        </p>
+
+        <div class="sim-layout">
+          <!-- Mapa -->
+          <div class="card map-card">
+            <div class="map-toolbar">
+              <div class="legend">
+                <span><i class="lg lg-origin"></i>Origen</span>
+                <span><i class="lg lg-dest"></i>Destino</span>
+                <span><i class="lg lg-front"></i>En cola</span>
+                <span><i class="lg lg-visited"></i>Visitado</span>
+                <span><i class="lg lg-path"></i>Ruta óptima</span>
+                <span><i class="lg lg-blocked"></i>Cerrada</span>
+              </div>
+              <div class="status-chips">
+                <span class="chip chip-peak" id="chipPeak" hidden>🚦 Hora pico</span>
+                <span class="chip chip-acc" id="chipBlocked" hidden>⛔ <b id="blockedCount">0</b> cerrada(s)</span>
+              </div>
+            </div>
+            <div class="canvas-scroll">
+              <canvas id="mapCanvas" aria-label="Mapa interactivo de la ciudad con 10 zonas y sus calles"></canvas>
+            </div>
+            <p class="map-hint">💡 Clic sobre una calle: editar minutos / cerrar · Clic sobre una zona: usarla como origen (Mayús + clic: destino)</p>
+          </div>
+
+          <!-- Panel de control -->
+          <aside class="card control-panel" aria-label="Controles del simulador">
+            <div class="ctrl-group">
+              <label for="originSelect">Origen</label>
+              <select id="originSelect"></select>
+            </div>
+            <div class="ctrl-group">
+              <label for="destSelect">Destino</label>
+              <select id="destSelect"></select>
+            </div>
+
+            <div class="ctrl-group">
+              <span class="ctrl-label">Escenarios</span>
+              <div class="btn-row">
+                <button class="btn btn-warn" id="btnPeak" aria-pressed="false">🚦 Hora pico</button>
+                <button class="btn btn-danger" id="btnAccident">💥 Accidente</button>
+              </div>
+              <button class="btn btn-ghost btn-block" id="btnReset">↺ Restablecer ciudad</button>
+            </div>
+
+            <div class="ctrl-group">
+              <span class="ctrl-label">Ejecución</span>
+              <button class="btn btn-primary btn-block" id="btnRun">⚡ Ejecutar instantáneo</button>
+              <div class="btn-row">
+                <button class="btn btn-secondary" id="btnStepStart">👣 Paso a paso</button>
+                <button class="btn btn-secondary" id="btnStep" disabled>Siguiente ▶</button>
+              </div>
+              <div class="btn-row">
+                <button class="btn btn-secondary" id="btnPlay" disabled>▶ Auto</button>
+                <button class="btn btn-secondary" id="btnFinish" disabled>⏭ Terminar</button>
+              </div>
+              <label class="speed" for="speedRange">Velocidad
+                <input type="range" id="speedRange" min="150" max="1500" step="50" value="700">
+              </label>
+            </div>
+          </aside>
+        </div>
+
+        <!-- Resultados -->
+        <div class="results-grid">
+          <div class="card result-route">
+            <h3>Ruta final</h3>
+            <div id="routeText" class="route-text muted">Pulsa «Ejecutar» o «Paso a paso» para calcular la ruta.</div>
+            <div class="route-meta" id="routeMeta"></div>
+          </div>
+
+          <div class="card">
+            <h3>Nodos visitados <small class="muted">(orden de extracción)</small></h3>
+            <div id="visitedList" class="visited-list"><span class="muted">—</span></div>
+            <h3 class="mt">Cola de prioridad</h3>
+            <div id="queueList" class="queue-list"><span class="muted">—</span></div>
+          </div>
+
+          <div class="card">
+            <h3>Registro de pasos</h3>
+            <ol id="stepLog" class="step-log"><li class="muted">Aún no se ha ejecutado el algoritmo.</li></ol>
+          </div>
+        </div>
+
+        <div class="card table-card">
+          <h3>Tabla de distancias mínimas</h3>
+          <div class="table-scroll">
+            <table class="dist-table" id="distTable">
+              <thead>
+                <tr><th>Zona</th><th>Distancia (min)</th><th>Predecesor</th><th>Estado</th></tr>
+              </thead>
+              <tbody></tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ============ 6. CONCLUSIONES ============ -->
+    <section id="conclusiones" class="section">
+      <div class="container">
+        <h2 class="section-title"><span class="num">06</span> Conclusiones</h2>
+
+        <div class="grid-2">
+          <article class="card">
+            <h3>Resultados obtenidos</h3>
+            <ul class="check-list">
+              <li>Se modeló una red urbana de <strong>10 zonas y 19 calles</strong> como un grafo ponderado no dirigido.</li>
+              <li>Dijkstra con montículo binario encontró siempre la <strong>ruta óptima</strong> en menos de un milisegundo.</li>
+              <li>Al activar la <strong>hora pico</strong>, el algoritmo tiende a sacar las rutas de las avenidas centrales y prefiere vías periféricas que, aunque son más largas, resultan más rápidas.</li>
+              <li>Ante un <strong>accidente</strong>, la ruta se recalcula al momento. Si no queda ningún camino, el sistema lo detecta y lo informa.</li>
+              <li>El modo <strong>paso a paso</strong> deja ver el comportamiento voraz: los nodos se fijan en orden creciente de distancia.</li>
+            </ul>
+          </article>
+          <article class="card">
+            <h3>Impacto práctico</h3>
+            <ul class="check-list">
+              <li><strong>Despacho de emergencias:</strong> elegir la unidad y la ruta que llegan antes reduce los tiempos de respuesta, de los que dependen vidas.</li>
+              <li><strong>Movilidad diaria:</strong> los navegadores GPS usan Dijkstra o variantes suyas (A*, Contraction Hierarchies) para miles de millones de consultas.</li>
+              <li><strong>Logística y reparto:</strong> menos minutos en ruta significan menos combustible, menos emisiones y menores costos.</li>
+              <li><strong>Planificación urbana:</strong> simular cierres permite identificar calles críticas cuyo bloqueo aísla zonas enteras.</li>
+            </ul>
+          </article>
+        </div>
+
+        <div class="card final-thought">
+          <p>
+            Dijkstra muestra que un algoritmo elegante y demostrablemente correcto, con más de 65 años de
+            antigüedad, sigue siendo una pieza central de la infraestructura digital de las ciudades. Su principal
+            limitación es que no admite pesos negativos y que explora en todas las direcciones. Esto abre la
+            puerta a trabajo futuro con <strong>A*</strong> (heurísticas geográficas), datos de tráfico
+            <strong>en tiempo real</strong> y grafos <strong>dirigidos</strong> con calles de un solo sentido.
+          </p>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <footer class="footer">
+    <div class="container">
+      <p>Proyecto universitario individual · Algoritmo de Dijkstra aplicado a rutas urbanas y despacho de emergencias</p>
+      <p class="muted">Hecho con HTML5, CSS3, JavaScript y Canvas. Sin dependencias externas.</p>
+    </div>
+  </footer>
+
+  <!-- Diálogo de edición de calle -->
+  <dialog id="edgeDialog" class="edge-dialog">
+    <form method="dialog" id="edgeForm">
+      <h3 id="edgeDialogTitle">Editar calle</h3>
+      <p class="muted" id="edgeDialogSub"></p>
+      <label for="edgeMinutes">Minutos de recorrido (sin hora pico)</label>
+      <input type="number" id="edgeMinutes" min="1" max="99" step="1" required>
+      <p class="muted small" id="edgePeakNote"></p>
+      <label class="switch-row">
+        <input type="checkbox" id="edgeBlocked">
+        <span>Calle cerrada (bloqueada)</span>
+      </label>
+      <div class="dialog-actions">
+        <button type="button" class="btn btn-ghost" id="edgeCancel">Cancelar</button>
+        <button type="submit" class="btn btn-primary" id="edgeSave" value="save">Guardar</button>
+      </div>
+    </form>
+  </dialog>
+
+  <div class="toast" id="toast" role="status" aria-live="polite"></div>
+
+  <script src="app.js"></script>
+</body>
+</html>
