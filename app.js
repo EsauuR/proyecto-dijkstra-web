@@ -692,7 +692,19 @@ function updateComputing() {
   root.classList.toggle('computing', !!state.timer || enRuta);
   const live = $('chipLive');
   if (live) live.hidden = !enRuta;
+  syncReplayButton();
   syncLogo();
+}
+
+/** Texto y estado del botón dorado según si la unidad está en bucle */
+function syncReplayButton() {
+  const btn = $('btnReplay'), label = $('replayLabel');
+  if (!btn || !label) return;
+  const looping = !!(state.anim && state.anim.loop);
+  btn.classList.toggle('is-looping', looping);
+  btn.setAttribute('aria-pressed', String(looping));
+  label.textContent = looping ? '🔄 Bucle activo · Reiniciar' : '🚑 Simular recorrido (bucle)';
+  btn.title = looping ? 'Reiniciar el recorrido desde el origen' : 'Ver a la unidad recorrer la ruta óptima en bucle continuo';
 }
 function syncLogo() {
   if (!logoSvg || typeof logoSvg.pauseAnimations !== 'function') return;
