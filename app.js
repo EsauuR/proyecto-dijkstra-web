@@ -547,7 +547,14 @@ function updateChips() {
 let rafId = 0;
 const easeInOut = (t) => t < 0.5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2;
 
-function startVehicle(path) {
+const LOOP_PAUSE = 1100;   // ms de pausa en el destino antes de volver a salir
+
+/**
+ * Lanza la unidad sobre la ruta óptima. Recorre la ruta en bucle continuo
+ * mientras exista la ruta; cualquier recálculo la reinicia desde el origen.
+ * `force` (botón «Repetir envío») la anima aunque el sistema pida reducir animaciones.
+ */
+function startVehicle(path, force = false) {
   if (path.length < 2) { stopAnim(); return; }
   const pts = path.map(i => ({ x: state.nodes[i].x, y: state.nodes[i].y }));
   const lens = [];
@@ -557,14 +564,18 @@ function startVehicle(path) {
     lens.push(l); total += l;
   }
   const now = performance.now();
-  const instant = reduceMotion.matches;
+  const animate = force || !reduceMotion.matches;
   state.anim = {
     pts, lens, total, t0: now, last: now,
-    dur: Math.max(1800, Math.min(5200, total / 260 * 1000)),
+    dur: Math.max(2600, Math.min(6500, total / 200 * 1000)),
+    minutes: state.vis && state.vis.dist ? state.vis.dist[state.dest] : 0,
     trail: [], particles: [],
-    moving: !instant,
-    arrivedAt: instant ? now - 5000 : 0,
-    pos: instant ? { ...pts[pts.length - 1], ang: 0 } : { ...pts[0], ang: 0 }
+    moving: animate,
+    loop: animate,
+    lap: 1,
+    progress: animate ? 0 : 1,
+    arrivedAt: animate ? 0 : now - 5000,
+    pos: animate ? { ...pts[0], ang: 0 } : { ...pts[pts.length - 1], ang: 0 }
   };
   updateComputing();
   kick();
@@ -592,54 +603,94 @@ function stepAnim(now) {
   a.last = now;
   let active = false;
 
+  // Nueva vuelta tras la pausa en el destino
+  if (!a.moving && a.loop && a.arrivedAt && now - a.arrivedAt >= LOOP_PAUSE) {
+    a.moving = true;
+    a.t0 = now;
+    a.arrivedAt = 0;
+    a.progress = 0;
+    a.trail = [];
+    a.lap++;
+  }
+
   if (a.moving) {
     const p = Math.min(1, (now - a.t0) / a.dur);
-    a.pos = pointAt(a, easeInOut(p) * a.total);
+    a.progress = easeInOut(p);
+    a.pos = pointAt(a, a.progress * a.total);
     a.trail.push({ x: a.pos.x, y: a.pos.y });
-    if (a.trail.length > 40) a.trail.shift();
-    for (let k = 0; k < 2; k++) {
-      a.particles.push({ x: a.pos.x + rand(-3, 3), y: a.pos.y + rand(-3, 3), vx: rand(-28, 28), vy: rand(-28, 28), life: 1, size: rand(1.2, 2.8) });
+    if (a.trail.length > 70) a.trail.shift();
+    // Estela de partículas: chispas que salen hacia atrás
+    for (let k = 0; k < 4; k++) {
+      const back = a.pos.ang + Math.PI + rand(-0.7, 0.7), sp = rand(20, 70);
+      a.particles.push({ x: a.pos.x + rand(-4, 4), y: a.pos.y + rand(-4, 4), vx: Math.cos(back) * sp, vy: Math.sin(back) * sp, life: 1, size: rand(1.4, 3.4) });
     }
     if (p >= 1) {
       a.moving = false;
       a.arrivedAt = now;
-      for (let k = 0; k < 34; k++) {
-        const ang = rand(0, Math.PI * 2), sp = rand(40, 150);
-        a.particles.push({ x: a.pos.x, y: a.pos.y, vx: Math.cos(ang) * sp, vy: Math.sin(ang) * sp, life: 1, size: rand(1.5, 3.2) });
+      for (let k = 0; k < 48; k++) {
+        const ang = rand(0, Math.PI * 2), sp = rand(50, 190);
+        a.particles.push({ x: a.pos.x, y: a.pos.y, vx: Math.cos(ang) * sp, vy: Math.sin(ang) * sp, life: 1, size: rand(1.6, 3.6) });
       }
-      updateComputing();
     }
     active = true;
   } else if (a.trail.length) {
     a.trail.splice(0, 3);
     active = true;
   }
+  const drag = Math.pow(0.95, dt * 60);   // frenado independiente de los FPS
   for (const pt of a.particles) {
     pt.x += pt.vx * dt; pt.y += pt.vy * dt;
-    pt.vx *= 0.96; pt.vy *= 0.96;
-    pt.life -= dt * 1.5;
+    pt.vx *= drag; pt.vy *= drag;
+    pt.life -= dt * 1.4;
   }
+  if (a.particles.length > 400) a.particles.splice(0, a.particles.length - 400);
   a.particles = a.particles.filter(pt => pt.life > 0);
-  if (a.particles.length) active = true;
+  if (a.loop || a.particles.length) active = true;
   if (a.arrivedAt && now - a.arrivedAt < 1100) active = true;
   return active;
 }
-function kick() { if (!rafId) rafId = requestAnimationFrame(frame); }
+
+/* El bucle solo pinta mientras el mapa está en pantalla y la pestaña visible */
+let mapOnScreen = true;
+function kick() { if (!rafId && mapOnScreen && !document.hidden) rafId = requestAnimationFrame(frame); }
 function frame(now) {
   rafId = 0;
   const active = stepAnim(now);
   draw(now);
   if (active) kick();
 }
+if ('IntersectionObserver' in window) {
+  new IntersectionObserver(([en]) => {
+    mapOnScreen = en.isIntersecting;
+    if (mapOnScreen && state.anim) { state.anim.last = performance.now(); kick(); }
+  }).observe(canvas);
+}
+document.addEventListener('visibilitychange', () => {
+  if (!document.hidden && state.anim) { state.anim.last = performance.now(); kick(); }
+});
+
+/** Botón «Repetir envío»: relanza la unidad desde el origen */
+function replayDispatch() {
+  if (!state.vis || state.vis.type !== 'found') {
+    if (state.stepper) { toast('Termina primero la ejecución paso a paso'); return; }
+    runInstant(true);
+  }
+  if (state.vis && state.vis.type === 'found') {
+    startVehicle(state.vis.path, true);
+    toast(`🚑 Unidad despachada: ${state.nodes[state.origin].name} → ${state.nodes[state.dest].name}`);
+  } else {
+    toast('No hay ruta disponible para enviar la unidad');
+  }
+}
 
 /* Logo dinámico: el punto de luz recorre la curva al pasar el cursor
    o mientras el simulador está calculando / la unidad está en ruta */
 let brandHover = false;
 function updateComputing() {
-  const on = !!state.timer || !!(state.anim && state.anim.moving);
-  root.classList.toggle('computing', on);
+  const enRuta = !!(state.anim && (state.anim.moving || state.anim.loop));
+  root.classList.toggle('computing', !!state.timer || enRuta);
   const live = $('chipLive');
-  if (live) live.hidden = !(state.anim && state.anim.moving);
+  if (live) live.hidden = !enRuta;
   syncLogo();
 }
 function syncLogo() {
@@ -770,15 +821,27 @@ function draw(now = performance.now()) {
   if (anim) {
     ctx.save();
     ctx.lineCap = 'round';
+    // Flujo de luz que avanza sobre la ruta óptima mientras la unidad está en servicio
+    if (anim.loop && anim.pts.length > 1) {
+      ctx.beginPath();
+      ctx.moveTo(anim.pts[0].x, anim.pts[0].y);
+      for (let i = 1; i < anim.pts.length; i++) ctx.lineTo(anim.pts[i].x, anim.pts[i].y);
+      ctx.strokeStyle = '#FFF3CF'; ctx.globalAlpha = 0.55; ctx.lineWidth = 2.5;
+      ctx.setLineDash([3, 22]); ctx.lineDashOffset = -now / 28;
+      ctx.stroke();
+      ctx.setLineDash([]);
+    }
+    // Estela dorada
     for (let i = 1; i < anim.trail.length; i++) {
       const t = i / anim.trail.length;
-      ctx.strokeStyle = C.gold; ctx.globalAlpha = t * 0.9; ctx.lineWidth = 2 + 7 * t;
-      ctx.shadowColor = C.gold; ctx.shadowBlur = 16;
+      ctx.strokeStyle = C.gold; ctx.globalAlpha = t * 0.95; ctx.lineWidth = 3 + 11 * t;
+      ctx.shadowColor = C.gold; ctx.shadowBlur = 24;
       ctx.beginPath(); ctx.moveTo(anim.trail[i - 1].x, anim.trail[i - 1].y); ctx.lineTo(anim.trail[i].x, anim.trail[i].y); ctx.stroke();
     }
-    ctx.shadowBlur = 8; ctx.shadowColor = C.gold;
+    // Partículas
+    ctx.shadowBlur = 10; ctx.shadowColor = C.gold;
     for (const p of anim.particles) {
-      ctx.globalAlpha = Math.max(0, p.life) * 0.9;
+      ctx.globalAlpha = Math.max(0, p.life) * 0.95;
       ctx.fillStyle = p.life > 0.6 ? '#FFF3CF' : C.gold;
       ctx.beginPath(); ctx.arc(p.x, p.y, p.size * (0.5 + p.life * 0.5), 0, Math.PI * 2); ctx.fill();
     }
@@ -866,32 +929,52 @@ function draw(now = performance.now()) {
   }
 
   // ---- Marcador de la unidad ----
-  if (anim && anim.moving) {
+  if (anim && (anim.moving || anim.loop)) {
     const p = anim.pos;
-    const pulse = 1 + 0.15 * Math.sin(now / 90);
+    const ph = now / 1000;
+    const pulse = 0.5 + 0.5 * Math.sin(ph * 6);
     ctx.save();
-    ctx.shadowColor = C.gold; ctx.shadowBlur = 30;
-    ctx.beginPath(); ctx.arc(p.x, p.y, 15 * pulse, 0, Math.PI * 2);
-    ctx.fillStyle = 'rgba(200,169,81,0.28)'; ctx.fill();
-    ctx.beginPath(); ctx.arc(p.x, p.y, 9, 0, Math.PI * 2);
+    // Ondas expansivas del halo (dos anillos desfasados)
+    for (let k = 0; k < 2; k++) {
+      const t = ((ph * 1.2) + k * 0.5) % 1;
+      ctx.beginPath(); ctx.arc(p.x, p.y, 16 + 34 * t, 0, Math.PI * 2);
+      ctx.strokeStyle = C.gold; ctx.globalAlpha = 0.6 * (1 - t); ctx.lineWidth = 2.5;
+      ctx.stroke();
+    }
+    ctx.globalAlpha = 1;
+    // Halo luminoso
+    const halo = ctx.createRadialGradient(p.x, p.y, 4, p.x, p.y, 34 + 6 * pulse);
+    halo.addColorStop(0, 'rgba(255,243,207,0.95)');
+    halo.addColorStop(0.35, 'rgba(200,169,81,0.55)');
+    halo.addColorStop(1, 'rgba(200,169,81,0)');
+    ctx.fillStyle = halo;
+    ctx.beginPath(); ctx.arc(p.x, p.y, 34 + 6 * pulse, 0, Math.PI * 2); ctx.fill();
+    // Cuerpo del marcador
+    ctx.shadowColor = C.gold; ctx.shadowBlur = 34;
+    ctx.beginPath(); ctx.arc(p.x, p.y, 14, 0, Math.PI * 2);
     ctx.fillStyle = C.gold; ctx.fill();
     ctx.shadowBlur = 0;
-    ctx.beginPath(); ctx.arc(p.x, p.y, 4, 0, Math.PI * 2);
+    ctx.lineWidth = 2.5; ctx.strokeStyle = '#101820'; ctx.stroke();
+    ctx.beginPath(); ctx.arc(p.x, p.y, 5.5 + 1.5 * pulse, 0, Math.PI * 2);
     ctx.fillStyle = '#FFF8E1'; ctx.fill();
     // Indicador de dirección
-    ctx.translate(p.x, p.y); ctx.rotate(p.ang);
-    ctx.beginPath(); ctx.moveTo(15, 0); ctx.lineTo(9, -4.5); ctx.lineTo(9, 4.5); ctx.closePath();
-    ctx.fillStyle = '#FFF8E1'; ctx.fill();
+    if (anim.moving) {
+      ctx.translate(p.x, p.y); ctx.rotate(p.ang);
+      ctx.beginPath(); ctx.moveTo(24, 0); ctx.lineTo(16, -6); ctx.lineTo(16, 6); ctx.closePath();
+      ctx.fillStyle = '#FFF8E1'; ctx.shadowColor = C.gold; ctx.shadowBlur = 12; ctx.fill();
+    }
     ctx.restore();
-    // Etiqueta
-    ctx.font = '600 11px "JetBrains Mono", monospace';
-    const lbl = '🚑 UNIDAD 01';
-    const tw = ctx.measureText(lbl).width + 16;
-    roundRect(p.x - tw / 2, p.y - 42, tw, 20, 10);
+    // Etiqueta con tiempo restante
+    const eta = Math.max(0, Math.round(anim.minutes * (1 - anim.progress)));
+    const lbl = anim.moving ? `🚑 UNIDAD 01 · ETA ${eta} min` : '🚑 UNIDAD 01 · EN DESTINO';
+    ctx.font = '700 11.5px "JetBrains Mono", monospace';
+    const tw = ctx.measureText(lbl).width + 20;
+    const ly = p.y - 56;
+    roundRect(p.x - tw / 2, ly, tw, 24, 12);
     ctx.fillStyle = '#101820'; ctx.fill();
-    ctx.strokeStyle = C.gold; ctx.lineWidth = 1; ctx.stroke();
-    ctx.fillStyle = '#E6D5B8'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
-    ctx.fillText(lbl, p.x, p.y - 31);
+    ctx.strokeStyle = C.gold; ctx.lineWidth = 1.5; ctx.stroke();
+    ctx.fillStyle = '#F4F1EA'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+    ctx.fillText(lbl, p.x, ly + 12.5);
   }
 
   // Indicador de hora pico
@@ -1217,6 +1300,21 @@ btnStepStart.addEventListener('click', startStepper);
 btnStep.addEventListener('click', () => { stopTimer(); nextStep(); });
 btnPlay.addEventListener('click', togglePlay);
 btnFinish.addEventListener('click', finishStepper);
+$('btnReplay').addEventListener('click', replayDispatch);
+
+/* ---- Guía rápida (?) ---- */
+const helpDialog = $('helpDialog');
+function openHelp() {
+  hideTip();
+  if (typeof helpDialog.showModal === 'function') helpDialog.showModal(); else helpDialog.setAttribute('open', '');
+}
+function closeHelp() {
+  if (typeof helpDialog.close === 'function') helpDialog.close(); else helpDialog.removeAttribute('open');
+}
+document.querySelectorAll('[data-help]').forEach(b => b.addEventListener('click', openHelp));
+$('helpClose').addEventListener('click', closeHelp);
+$('helpStart').addEventListener('click', closeHelp);
+helpDialog.addEventListener('click', (evt) => { if (evt.target === helpDialog) closeHelp(); });  // clic fuera
 speedRange.addEventListener('input', () => { if (state.timer) { stopTimer(); togglePlay(); } });
 
 /* ---- Toast ---- */

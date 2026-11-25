@@ -357,7 +357,10 @@
       <div class="container">
         <header class="sec-head reveal">
           <span class="kicker">05 / 06 · En vivo</span>
-          <h2>Aplicación en Vivo: Simulador</h2>
+          <div class="title-row">
+            <h2>Aplicación en Vivo: Simulador</h2>
+            <button type="button" class="help-btn help-btn-lg" data-help aria-label="Abrir la guía rápida del simulador" title="¿Cómo funciona?">?</button>
+          </div>
           <p class="sec-lead">Elige origen y destino, altera el tráfico y observa cómo Dijkstra recalcula la ruta y envía la unidad. <strong>Haz clic en cualquier calle</strong> para cambiar sus minutos o cerrarla.</p>
         </header>
 
@@ -373,10 +376,14 @@
                 <span><i class="lg lg-bfs"></i>Menos saltos</span>
                 <span><i class="lg lg-blocked"></i>Cerrada</span>
               </div>
-              <div class="status-chips">
-                <span class="chip chip-peak" id="chipPeak" hidden>Hora pico</span>
-                <span class="chip chip-acc" id="chipBlocked" hidden><b id="blockedCount">0</b> cerrada(s)</span>
-                <span class="chip chip-live" id="chipLive" hidden>Unidad en ruta</span>
+              <div class="toolbar-right">
+                <div class="status-chips">
+                  <span class="chip chip-peak" id="chipPeak" hidden>Hora pico</span>
+                  <span class="chip chip-acc" id="chipBlocked" hidden><b id="blockedCount">0</b> cerrada(s)</span>
+                  <span class="chip chip-live" id="chipLive" hidden>Unidad en ruta</span>
+                </div>
+                <button type="button" class="btn btn-replay" id="btnReplay" title="Lanzar de nuevo la unidad desde el origen">🚑 Repetir envío</button>
+                <button type="button" class="help-btn" data-help aria-label="Abrir la guía rápida del simulador" title="¿Cómo funciona?">?</button>
               </div>
             </div>
             <div class="canvas-scroll">
@@ -535,6 +542,67 @@
         <button type="submit" class="btn btn-gold" value="save">Guardar</button>
       </div>
     </form>
+  </dialog>
+
+  <!-- Guía rápida del simulador -->
+  <dialog id="helpDialog" class="help-dialog" aria-labelledby="helpTitle">
+    <div class="help-head">
+      <div>
+        <span class="card-kicker">Guía rápida · 4 pasos</span>
+        <h3 id="helpTitle">Cómo usar el simulador</h3>
+      </div>
+      <button type="button" class="icon-btn help-close" id="helpClose" aria-label="Cerrar la guía">
+        <svg viewBox="0 0 24 24" width="16" height="16"><path d="M6 6l12 12M18 6L6 18" fill="none" stroke-width="2.2" stroke-linecap="round"/></svg>
+      </button>
+    </div>
+
+    <ol class="help-steps">
+      <li class="help-step">
+        <div class="hs-icon" aria-hidden="true">
+          <svg viewBox="0 0 48 48"><path class="hs-line" d="M12 36 C 18 18, 30 30, 36 12" /><circle class="hs-a" cx="12" cy="36" r="5"/><circle class="hs-b" cx="36" cy="12" r="5"/><path class="hs-fill" d="M36 3a6 6 0 0 0-6 6c0 4.5 6 10 6 10s6-5.5 6-10a6 6 0 0 0-6-6z" opacity=".35"/></svg>
+        </div>
+        <div>
+          <span class="hs-num">01</span>
+          <h4>Elige origen y destino</h4>
+          <p>Usa los selectores del panel o haz <b>clic en una zona</b> del mapa para fijar el origen. Con <kbd>Mayús</kbd> + clic la fijas como destino.</p>
+        </div>
+      </li>
+      <li class="help-step">
+        <div class="hs-icon" aria-hidden="true">
+          <svg viewBox="0 0 48 48"><rect class="hs-stroke" x="17" y="5" width="14" height="34" rx="5"/><circle class="hs-red" cx="24" cy="13" r="3.4"/><circle class="hs-gold" cx="24" cy="22" r="3.4"/><circle class="hs-green" cx="24" cy="31" r="3.4"/><path class="hs-stroke" d="M24 39v5M16 44h16"/></svg>
+        </div>
+        <div>
+          <span class="hs-num">02</span>
+          <h4>Simula escenarios reales</h4>
+          <p>Activa <b>Hora pico</b> (el centro tarda el doble), provoca un <b>Accidente</b> o haz <b>clic sobre cualquier calle</b> para editar sus minutos o cerrarla.</p>
+        </div>
+      </li>
+      <li class="help-step">
+        <div class="hs-icon" aria-hidden="true">
+          <svg viewBox="0 0 48 48"><circle class="hs-stroke" cx="24" cy="24" r="18"/><path class="hs-fill" d="M26 9 L15 27 h8 l-2 12 L33 21 h-8 z"/></svg>
+        </div>
+        <div>
+          <span class="hs-num">03</span>
+          <h4>Ejecuta Dijkstra</h4>
+          <p>De golpe con <b>Ejecutar instantáneo</b>, o iteración por iteración con <b>Paso a paso</b> (usa <i>Siguiente</i>, <i>Auto</i> o <i>Terminar</i>). La unidad recorrerá la ruta óptima en bucle.</p>
+        </div>
+      </li>
+      <li class="help-step">
+        <div class="hs-icon" aria-hidden="true">
+          <svg viewBox="0 0 48 48"><path class="hs-stroke" d="M6 42h36"/><rect class="hs-green-f" x="10" y="24" width="7" height="16" rx="2"/><rect class="hs-gold-f" x="21" y="12" width="7" height="28" rx="2"/><rect class="hs-green-f" x="32" y="19" width="7" height="21" rx="2"/></svg>
+        </div>
+        <div>
+          <span class="hs-num">04</span>
+          <h4>Analiza los resultados</h4>
+          <p>Revisa el panel <b>Ahorro de tiempo</b> (Dijkstra frente a la ruta con menos saltos), el registro de pasos y la <b>tabla de distancias mínimas</b>.</p>
+        </div>
+      </li>
+    </ol>
+
+    <div class="help-foot">
+      <span class="muted small">Consejo: pasa el cursor sobre zonas y calles para ver sus detalles.</span>
+      <button type="button" class="btn btn-gold" id="helpStart">Entendido, ¡a simular!</button>
+    </div>
   </dialog>
 
   <div class="toast" id="toast" role="status" aria-live="polite"></div>
